@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyDiceApply</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    EasyDiceApply
+                </h2>
+            </div>
+            
+            <form id="automationForm" class="mt-8 space-y-6">
+                <!-- Credentials -->
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <input id="username" name="username" type="email" required 
+                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                            placeholder="Email address">
+                    </div>
+                    <div>
+                        <input id="password" name="password" type="password" required 
+                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                            placeholder="Password">
+                    </div>
+                </div>
+
+                <!-- Job Search Settings -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="keyword" class="block text-sm font-medium text-gray-700">Search Keyword</label>
+                        <input type="text" id="keyword" name="keyword" required
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            placeholder="e.g., Software Engineer">
+                    </div>
+                    
+                    <div>
+                        <label for="max_applications" class="block text-sm font-medium text-gray-700">Maximum Applications</label>
+                        <input type="number" id="max_applications" name="max_applications" min="1" max="50" value="10"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+
+                    <!-- Resume Upload Section -->
+                    <div>
+                        <label for="resume" class="block text-sm font-medium text-gray-700">Resume (PDF, DOC, DOCX)</label>
+                        <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" required
+                            class="mt-1 block w-full text-sm text-gray-600
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-indigo-50 file:text-indigo-700
+                                hover:file:bg-indigo-100">
+                        <p class="mt-1 text-xs text-gray-500">Max file size: 10MB</p>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="space-y-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="today_only" name="filters.today_only"
+                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                        <label for="today_only" class="ml-2 block text-sm text-gray-900">
+                            Today's Posts Only
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="third_party" name="filters.third_party"
+                            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                        <label for="third_party" class="ml-2 block text-sm text-gray-900">
+                            Third Party Jobs
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" id="submitButton"
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Start Automation
+                    </button>
+                </div>
+            </form>
+
+            <div id="status" class="mt-4 text-sm text-center hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadResume(file) {
+            const formData = new FormData();
+            formData.append('resume', file);
+
+            try {
+                const uploadResponse = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    throw new Error(errorData.error || 'Failed to upload resume');
+                }
+
+                const uploadResult = await uploadResponse.json();
+                console.log('Resume uploaded:', uploadResult);
+                return uploadResult.path;
+            } catch (error) {
+                console.error('Resume upload error:', error);
+                throw error;
+            }
+        }
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden');
+            if (isError) {
+                statusDiv.classList.add('text-red-600');
+                statusDiv.classList.remove('text-green-600');
+            } else {
+                statusDiv.classList.add('text-green-600');
+                statusDiv.classList.remove('text-red-600');
+            }
+        }
+
+        function setLoadingState(loading) {
+            const submitButton = document.getElementById('submitButton');
+            submitButton.disabled = loading;
+            submitButton.textContent = loading ? 'Processing...' : 'Start Automation';
+        }
+
+        document.getElementById('automationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            setLoadingState(true);
+            
+            try {
+                // First handle resume upload
+                const resumeFile = document.getElementById('resume').files[0];
+                if (!resumeFile) {
+                    throw new Error('Please select a resume file');
+                }
+
+                // Check file size (10MB limit)
+                const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+                if (resumeFile.size > maxSize) {
+                    throw new Error('Resume file size must be less than 10MB');
+                }
+
+                showStatus('Uploading resume...');
+                const resumePath = await uploadResume(resumeFile);
+                showStatus('Resume uploaded successfully');
+
+                const formData = {
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value,
+                    keyword: document.getElementById('keyword').value,
+                    max_applications: parseInt(document.getElementById('max_applications').value),
+                    filters: {
+                        today_only: document.getElementById('today_only').checked,
+                        third_party: document.getElementById('third_party').checked
+                    },
+                    resume_path: resumePath
+                };
+
+                console.log('Starting automation...', formData);
+                showStatus('Starting automation...');
+
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    console.log('Automation started successfully:', data);
+                    window.location.href = '/status';
+                } else {
+                    throw new Error(data.error || 'Failed to start automation');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(error.message || 'An error occurred', true);
+                setLoadingState(false);
+            }
+        });
+
+        // Add file input validation
+        document.getElementById('resume').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+                if (file.size > maxSize) {
+                    showStatus('File size must be less than 10MB', true);
+                    this.value = ''; // Clear the file input
+                } else {
+                    const fileType = file.name.split('.').pop().toLowerCase();
+                    if (!['pdf', 'doc', 'docx'].includes(fileType)) {
+                        showStatus('Only PDF, DOC, and DOCX files are allowed', true);
+                        this.value = ''; // Clear the file input
+                    } else {
+                        showStatus('File selected: ' + file.name);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
