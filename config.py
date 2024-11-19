@@ -14,7 +14,7 @@ RESUME_SETTINGS = {
 UI_SETTINGS = {
     "port": 5000,
     "host": "localhost",
-    "debug": True
+    "debug": False
 }
 
 # Application settings
