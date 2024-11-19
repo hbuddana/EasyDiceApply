@@ -174,19 +174,22 @@ def get_status():
     """Return the current automation status."""
     return jsonify(automation_status)
 
-if __name__ == '__main__':
+import os
+
+if __name__ == "__main__":
     print(f"Template directory: {template_dir}")
     print(f"Static directory: {static_dir}")
     print(f"Upload directory: {UPLOAD_FOLDER}")
+
+    # Fetch the PORT from environment variables or default to 5000
+    port = int(os.environ.get("PORT", 5000))
+    
     try:
-        app.run(debug=True, port=5001)
+        app.run(host="0.0.0.0", port=port, debug=False)  # Use 0.0.0.0 for external access
     except OSError as e:
-        print(f"Failed to start on port 5001. Trying alternative port 5002...")
-        try:
-            app.run(debug=True, port=5002)
-        except OSError:
-            print("Failed to start on port 5002 as well. Please specify a different port.")
-            raise
+        print(f"Failed to start on port {port}. Please check your configuration.")
+        raise
+
 # from flask import Flask, render_template, request, jsonify
 # from werkzeug.utils import secure_filename
 # import os
